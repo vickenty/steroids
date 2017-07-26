@@ -4,3 +4,4 @@ version = "0.1.0"
 authors = ["Vickenty Fesunov <kent@setattr.net>"]
 
 [dependencies]
+three="0.2"
