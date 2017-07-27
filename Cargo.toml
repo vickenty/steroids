@@ -5,3 +5,4 @@ authors = ["Vickenty Fesunov <kent@setattr.net>"]
 
 [dependencies]
 three="0.2"
+cgmath="0.14"
