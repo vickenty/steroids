@@ -1,10 +1,6 @@
 extern crate three;
-extern crate cgmath;
-
-use cgmath::One;
-use cgmath::Rotation3;
-use cgmath::Rotation;
-use cgmath::InnerSpace;
+extern crate nphysics3d;
+extern crate ncollide;
 
 struct Controller {
     pu: three::Button,
@@ -15,58 +11,67 @@ struct Controller {
     rr: three::Button,
     fwd: three::Button,
     rev: three::Button,
-
-    position: cgmath::Vector3<f32>,
-    rotation: cgmath::Quaternion<f32>,
 }
 
+const C: f32 = 1.0;
+
 impl Controller {
-    fn update(&mut self, target: &mut three::Object, window: &three::Window) {
+    fn update(&mut self, target: &nphysics3d::object::RigidBodyHandle<f32>, input: &three::Input) {
         let mut dx = 0.0;
         let mut dy = 0.0;
         let mut dz = 0.0;
         let mut sp = 0.0;
 
-        if self.pu.is_hit(&window.input) {
-            dz += 0.02;
+        if self.pu.is_hit(&input) {
+            dz += C;
         }
-        if self.pd.is_hit(&window.input) {
-            dz -= 0.02;
+        if self.pd.is_hit(&input) {
+            dz -= C;
         }
-        if self.yl.is_hit(&window.input) {
-            dy += 0.02;
+        if self.yl.is_hit(&input) {
+            dy += C;
         }
-        if self.yr.is_hit(&window.input) {
-            dy -= 0.02;
+        if self.yr.is_hit(&input) {
+            dy -= C;
         }
-        if self.rl.is_hit(&window.input) {
-            dx += 0.02;
+        if self.rl.is_hit(&input) {
+            dx += C;
         }
-        if self.rr.is_hit(&window.input) {
-            dx -= 0.02;
+        if self.rr.is_hit(&input) {
+            dx -= C;
         }
-        if self.fwd.is_hit(&window.input) {
-            sp += 0.02;
+        if self.fwd.is_hit(&input) {
+            sp += C;
         }
-        if self.rev.is_hit(&window.input) {
-            sp -= 0.02;
+        if self.rev.is_hit(&input) {
+            sp -= C;
         }
 
-        let rx = cgmath::Quaternion::from_angle_x(cgmath::Rad(dx));
-        let ry = cgmath::Quaternion::from_angle_y(cgmath::Rad(dy));
-        let rz = cgmath::Quaternion::from_angle_z(cgmath::Rad(dz));
+        let mut b = target.borrow_mut();
+        let r = b.position().rotation;
+        b.append_lin_force(r * nphysics3d::math::Vector::new(sp, 0.0, 0.0));
+        b.append_ang_force(r * nphysics3d::math::Vector::new(dx, dy, dz));
+    }
+}
 
-        self.rotation = rx * ry * rz * self.rotation;
+struct Entity {
+    body: nphysics3d::object::RigidBodyHandle<f32>,
+    mesh: three::Mesh,
+}
 
-        let ax = self.rotation.invert() * cgmath::Vector3::unit_x();
-        let az = cgmath::vec3(ax.z, ax.y, -ax.x);
+impl Entity {
+    fn update_body(&mut self) {
+        self.body.borrow_mut().clear_forces();
+    }
 
-        self.position += az * sp;
+    fn update_mesh(&mut self) {
+        let body = self.body.borrow();
+        let pos = body.position();
 
-        let pf: [f32; 3] = self.position.into();
-        let rf: [f32; 4] = self.rotation.into();
+        let pf: [f32; 3] = pos.translation.vector.into();
+        let rf: [f32; 4] = pos.rotation.as_ref().coords.into();
 
-        target.set_transform(pf, rf, 1.0);
+        self.mesh.set_transform(pf, rf, 1.0);
     }
 }
 
@@ -77,8 +82,13 @@ fn main() {
     camera.look_at([3.0, 3.0, 1.0], [0.0, 0.0, 0.0], None);
 
     let cube_geom = three::Geometry::new_box(1.0, 1.0, 1.0);
-    let mut cube_mesh = window.factory.mesh(cube_geom, three::Material::LineBasic { color: 0xFFFF_FFFF });
+    let cube_mesh = window.factory.mesh(cube_geom, three::Material::LineBasic { color: 0xFFFF_FFFF });
     window.scene.add(&cube_mesh);
+
+    let mut world = nphysics3d::world::World::new();
+    let cube_shape = ncollide::shape::Ball::new(1.0);
+    let cube_phys = nphysics3d::object::RigidBody::new_dynamic(cube_shape, 1.0, 0.1, 0.1);
+    let cube_hndl = world.add_rigid_body(cube_phys);
 
     let mut control = Controller {
         pu: three::Button::Key(three::Key::Up),
@@ -90,13 +100,19 @@ fn main() {
 
         fwd: three::Button::Key(three::Key::A),
         rev: three::Button::Key(three::Key::Z),
+    };
 
-        position: cgmath::vec3(0.0, 0.0, 0.0),
-        rotation: cgmath::Quaternion::one(),
+    let mut cube = Entity {
+        body: cube_hndl,
+        mesh: cube_mesh,
     };
 
     while window.update() {
-        control.update(&mut cube_mesh, &window);
+        cube.update_body();
+        control.update(&mut cube.body, &window.input);
+        world.step(0.017);
+        cube.update_mesh();
+
         window.render(&camera);
     }
 }
