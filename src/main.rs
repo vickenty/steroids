@@ -62,11 +62,11 @@ struct Entity {
 impl Entity {
     fn new(factory: &mut three::Factory, world: &mut nphysics3d::world::World<f32>) -> Self {
         let shape = ncollide::shape::Cuboid::new(nphysics3d::math::Vector::new(0.5, 0.5, 0.5));
-        let body = nphysics3d::object::RigidBody::new_dynamic(shape, 1.0, 0.1, 0.1);
+        let body = nphysics3d::object::RigidBody::new_dynamic(shape, 1.0, 1.0, 1.0);
         let hndl = world.add_rigid_body(body);
 
         let geom = three::Geometry::new_box(1.0, 1.0, 1.0);
-        let mesh = factory.mesh(geom, three::Material::LineBasic { color: 0xFFFF_FFFF });
+        let mesh = factory.mesh(geom, three::Material::MeshLambert { color: 0xabcdef, flat: true });
 
         Entity {
             body: hndl,
@@ -96,6 +96,16 @@ impl Entity {
 
 fn main() {
     let mut window = three::Window::new("Steroids", "shaders");
+
+    let mut lamp0 = window.factory.directional_light(0xddddffff, 0.5);
+    lamp0.look_at([0.0, 0.0, 0.0], [-1.0, -1.0, 1.0], None);
+    window.scene.add(&lamp0);
+
+    let lamp1 = window.factory.directional_light(0xffffffff, 0.4);
+    window.scene.add(&lamp1);
+
+    let lamp2 = window.factory.ambient_light(0xddffffff, 0.01);
+    window.scene.add(&lamp2);
 
     let mut camera = window.factory.perspective_camera(45.0, 0.1, 100.0);
     let mut world = nphysics3d::world::World::new();
