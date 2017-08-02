@@ -5,6 +5,5 @@ authors = ["Vickenty Fesunov <kent@setattr.net>"]
 
 [dependencies]
 three="0.2"
-cgmath="0.14"
 nphysics3d="0.6"
 ncollide="0.11"
