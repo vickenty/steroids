@@ -78,7 +78,7 @@ impl Entity {
         }
     }
 
-    fn update_body(&mut self) {
+    fn update_body(&self) {
         self.body.borrow_mut().clear_forces();
     }
 
