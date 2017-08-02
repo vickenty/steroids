@@ -16,7 +16,7 @@ struct Controller {
 const C: f32 = 1.0;
 
 impl Controller {
-    fn update(&mut self, target: &nphysics3d::object::RigidBodyHandle<f32>, input: &three::Input) {
+    fn update(&self, target: &nphysics3d::object::RigidBodyHandle<f32>, input: &three::Input) {
         let mut dx = 0.0;
         let mut dy = 0.0;
         let mut dz = 0.0;
@@ -110,7 +110,7 @@ fn main() {
     let mut camera = window.factory.perspective_camera(45.0, 0.1, 100.0);
     let mut world = nphysics3d::world::World::new();
 
-    let mut control = Controller {
+    let control = Controller {
         pu: three::Button::Key(three::Key::Up),
         pd: three::Button::Key(three::Key::Down),
         yl: three::Button::Key(three::Key::Left),
