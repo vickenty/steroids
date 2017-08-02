@@ -2,6 +2,8 @@ extern crate three;
 extern crate nphysics3d;
 extern crate ncollide;
 
+use std::collections::HashMap;
+
 struct Controller {
     pu: three::Button,
     pd: three::Button,
@@ -60,13 +62,15 @@ struct Entity {
 }
 
 impl Entity {
-    fn new(factory: &mut three::Factory, world: &mut nphysics3d::world::World<f32>) -> Self {
+    fn new(window: &mut three::Window, world: &mut nphysics3d::world::World<f32>, x: f32, y: f32, z: f32) -> Self {
         let shape = ncollide::shape::Cuboid::new(nphysics3d::math::Vector::new(0.5, 0.5, 0.5));
-        let body = nphysics3d::object::RigidBody::new_dynamic(shape, 1.0, 1.0, 1.0);
+        let mut body = nphysics3d::object::RigidBody::new_dynamic(shape, 1.0, 1.0, 1.0);
+        body.set_translation(nphysics3d::math::Translation::new(x, y, z));
         let hndl = world.add_rigid_body(body);
 
         let geom = three::Geometry::new_box(1.0, 1.0, 1.0);
-        let mesh = factory.mesh(geom, three::Material::MeshLambert { color: 0xabcdef, flat: true });
+        let mesh = window.factory.mesh(geom, three::Material::MeshLambert { color: 0xabcdef, flat: true });
+        window.scene.add(&mesh);
 
         Entity {
             body: hndl,
@@ -90,7 +94,43 @@ impl Entity {
 
     fn look_at<P>(&self, camera: &mut three::Camera<P>) {
         let pf: [f32; 3] = self.body.borrow().position().translation.vector.into();
-        camera.look_at([3.0, 3.0, 1.0], pf, None);
+        camera.look_at([5.0, 5.0, 5.0], pf, None);
+    }
+}
+
+struct Registry {
+    counter: u64,
+    entities: HashMap<u64, Entity>,
+}
+
+impl Registry {
+    fn new() -> Self {
+        Registry {
+            counter: 0,
+            entities: HashMap::new(),
+        }
+    }
+
+    fn add(&mut self, window: &mut three::Window, world: &mut nphysics3d::world::World<f32>, x: f32, y: f32, z: f32) -> u64 {
+        let id = self.counter;
+        self.counter += 1;
+
+        let ent = Entity::new(window, world, x, y, z);
+        self.entities.insert(id, ent);
+
+        id
+    }
+
+    fn apply_one<F: FnMut(&mut Entity)>(&mut self, id: u64, mut f: F) {
+        if let Some(ent_ref) = self.entities.get_mut(&id) {
+            f(ent_ref)
+        }
+    }
+
+    fn apply_all<F: FnMut(&mut Entity)>(&mut self, mut f: F) {
+        for e in self.entities.values_mut() {
+            f(e)
+        }
     }
 }
 
@@ -122,27 +162,22 @@ fn main() {
         rev: three::Button::Key(three::Key::Z),
     };
 
-    let mut c1 = Entity::new(&mut window.factory, &mut world);
-    window.scene.add(&c1.mesh);
+    let mut entities = Registry::new();
 
-    let mut c2 = Entity::new(&mut window.factory, &mut world);
-    window.scene.add(&c2.mesh);
-
-    c1.body.borrow_mut().set_translation(nphysics3d::math::Translation::new(-1.1, 0.1, 0.0));
-    c2.body.borrow_mut().set_translation(nphysics3d::math::Translation::new(1.1, -0.1, 0.0));
+    let player_id = entities.add(&mut window, &mut world, -1.1, 0.1, 0.0);
+    entities.add(&mut window, &mut world, 1.1, -0.1, 0.0);
+    entities.add(&mut window, &mut world, 2.2, -0.1, 0.1);
+    entities.add(&mut window, &mut world, 3.3, -0.1, 0.2);
+    entities.add(&mut window, &mut world, 4.4, -0.1, 0.3);
 
     while window.update() {
-        c1.update_body();
-        c2.update_body();
-
-        control.update(&mut c1.body, &window.input);
+        entities.apply_all(|e| e.update_body());
+        entities.apply_one(player_id, |e| control.update(&e.body, &window.input));
 
         world.step(0.017);
 
-        c1.update_mesh();
-        c2.update_mesh();
-
-        c1.look_at(&mut camera);
+        entities.apply_all(|e| e.update_mesh());
+        entities.apply_one(player_id, |e| e.look_at(&mut camera));
 
         window.render(&camera);
     }
