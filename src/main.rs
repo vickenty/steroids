@@ -3,8 +3,6 @@ extern crate nphysics3d;
 extern crate ncollide;
 
 use std::collections::HashMap;
-//use std::borrow::BorrowMut;
-//use std::borrow::Borrow;
 
 struct Controller {
     pu: three::Button,
@@ -64,18 +62,17 @@ struct Entity {
 }
 
 struct Cube {
-    //    body: nphysics3d::object::RigidBodyHandle<f32>,
-    //    mesh: three::Mesh,
     entity: Entity,
 }
 
-impl Ent for Cube {
-    fn new(window: &mut three::Window, world: &mut nphysics3d::world::World<f32>, properties: HashMap<&'static str, f32>) -> Box<Ent> {
+struct Bullet {
+    entity: Entity,
+}
+
+impl Cube {
+    fn new(window: &mut three::Window, world: &mut nphysics3d::world::World<f32>, x: f32, y: f32, z: f32) -> Cube {
         let shape = ncollide::shape::Cuboid::new(nphysics3d::math::Vector::new(0.5, 0.5, 0.5));
         let mut body = nphysics3d::object::RigidBody::new_dynamic(shape, 1.0, 1.0, 1.0);
-        let x = properties.get("x").cloned().unwrap();
-        let y = properties.get("y").cloned().unwrap();
-        let z = properties.get("z").cloned().unwrap();
 
         body.set_translation(nphysics3d::math::Translation::new(x, y, z));
         let hndl = world.add_rigid_body(body);
@@ -84,28 +81,57 @@ impl Ent for Cube {
         let mesh = window.factory.mesh(geom, three::Material::MeshLambert { color: 0xabcdef, flat: true });
         window.scene.add(&mesh);
 
-        Box::new(
-            Cube {
-                entity:
-                Entity {
-                    body: hndl,
-                    mesh: mesh,
-                }
-            })
+        Cube {
+            entity: Entity {
+                body: hndl,
+                mesh: mesh,
+            }
+        }
     }
+}
+
+impl Bullet {
+    fn new(window: &mut three::Window, world: &mut nphysics3d::world::World<f32>, x: f32, y: f32, z: f32) -> Bullet {
+        let shape = ncollide::shape::Cylinder::new(0.5, 0.1);
+        let mut body = nphysics3d::object::RigidBody::new_dynamic(shape, 1.0, 1.0, 1.0);
+
+        body.set_translation(nphysics3d::math::Translation::new(x, y, z));
+        let hndl = world.add_rigid_body(body);
+
+        let geom = three::Geometry::new_cylinder(0.1, 0.1, 1.0, 256);
+        let mesh = window.factory.mesh(geom, three::Material::MeshLambert { color: 0xabcdef, flat: true });
+        window.scene.add(&mesh);
+
+        Bullet {
+            entity: Entity {
+                body: hndl,
+                mesh: mesh,
+            }
+        }
+    }
+}
+
+
+impl Ent for Cube {
     fn get_body(&self) -> nphysics3d::object::RigidBodyHandle<f32> {
         self.entity.body.clone()
     }
-
     fn get_mesh(&mut self) -> &mut three::Mesh {
         &mut self.entity.mesh
     }
 }
 
-trait Ent {
-    fn new(window: &mut three::Window, world: &mut nphysics3d::world::World<f32>, properties: HashMap<&'static str, f32>) -> Box<Ent>
-        where Self: Sized;
+impl Ent for Bullet {
+    fn get_body(&self) -> nphysics3d::object::RigidBodyHandle<f32> {
+        self.entity.body.clone()
+    }
+    fn get_mesh(&mut self) -> &mut three::Mesh {
+        &mut self.entity.mesh
+    }
+}
 
+
+trait Ent {
     fn get_body(&self) -> nphysics3d::object::RigidBodyHandle<f32>;
 
     fn get_mesh(&mut self) -> &mut three::Mesh;
@@ -133,42 +159,6 @@ trait Ent {
     }
 }
 
-//impl Entity {
-//    fn new(window: &mut three::Window, world: &mut nphysics3d::world::World<f32>, x: f32, y: f32, z: f32) -> Self {
-//        let shape = ncollide::shape::Cuboid::new(nphysics3d::math::Vector::new(0.5, 0.5, 0.5));
-//        let mut body = nphysics3d::object::RigidBody::new_dynamic(shape, 1.0, 1.0, 1.0);
-//        body.set_translation(nphysics3d::math::Translation::new(x, y, z));
-//        let hndl = world.add_rigid_body(body);
-//
-//        let geom = three::Geometry::new_box(1.0, 1.0, 1.0);
-//        let mesh = window.factory.mesh(geom, three::Material::MeshLambert { color: 0xabcdef, flat: true });
-//        window.scene.add(&mesh);
-//
-//        Entity {
-//            body: hndl,
-//            mesh: mesh,
-//        }
-//    }
-//
-//    fn update_body(&self) {
-//        self.body.borrow_mut().clear_forces();
-//    }
-//
-//    fn update_mesh(&mut self) {
-//        let body = self.body.borrow();
-//        let pos = body.position();
-//
-//        let pf: [f32; 3] = pos.translation.vector.into();
-//        let rf: [f32; 4] = pos.rotation.as_ref().coords.into();
-//
-//        self.mesh.set_transform(pf, rf, 1.0);
-//    }
-//
-//    fn look_at<P>(&self, camera: &mut three::Camera<P>) {
-//        let pf: [f32; 3] = self.body.borrow().position().translation.vector.into();
-//        camera.look_at([5.0, 5.0, 5.0], pf, None);
-//    }
-//}
 
 struct Registry {
     counter: u64,
@@ -183,18 +173,10 @@ impl Registry {
         }
     }
 
-    fn add(&mut self, window: &mut three::Window, world: &mut nphysics3d::world::World<f32>, x: f32, y: f32, z: f32) -> u64 {
+    fn add<T>(&mut self, entity: T) -> u64 where T: Ent + 'static {
         let id = self.counter;
         self.counter += 1;
-
-        let mut properties: HashMap<&'static str, f32> = HashMap::new();
-        properties.insert("x", x);
-        properties.insert("y", y);
-        properties.insert("z", z);
-
-        let ent = Cube::new(window, world, properties);
-        self.entities.insert(id, ent);
-
+        self.entities.insert(id, Box::new(entity));
         id
     }
 
@@ -241,11 +223,13 @@ fn main() {
 
     let mut entities = Registry::new();
 
-    let player_id = entities.add(&mut window, &mut world, -1.1, 0.1, 0.0);
-    entities.add(&mut window, &mut world, 1.1, -0.1, 0.0);
-    entities.add(&mut window, &mut world, 2.2, -0.1, 0.1);
-    entities.add(&mut window, &mut world, 3.3, -0.1, 0.2);
-    entities.add(&mut window, &mut world, 4.4, -0.1, 0.3);
+    let player_id = entities.add(Cube::new(&mut window, &mut world, -1.1, 0.1, 0.0));
+    entities.add(Cube::new(&mut window, &mut world, 1.1, -0.1, 0.0));
+    entities.add(Cube::new(&mut window, &mut world, 2.2, -0.1, 0.1));
+    entities.add(Cube::new(&mut window, &mut world, 3.3, -0.1, 0.2));
+    entities.add(Cube::new(&mut window, &mut world, 4.4, -0.1, 0.3));
+
+    entities.add(Bullet::new(&mut window, &mut world, 0.5, -0.1, 2.0));
 
     while window.update() {
         entities.apply_all(|e| e.update_body());
