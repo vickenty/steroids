@@ -15,46 +15,58 @@ struct Controller {
     rr: three::Button,
     fwd: three::Button,
     rev: three::Button,
+    pew: three::Button,
 }
 
 const C: f32 = 1.0;
 
 impl Controller {
-    fn update(&self, target: &nphysics3d::object::RigidBodyHandle<f32>, input: &three::Input) {
+    fn update(
+        &self,
+        target: &mut Ship,
+        window: &mut three::Window,
+        world: &mut nphysics3d::world::World<f32>,
+        registry: &mut Registry,
+    ) {
         let mut dx = 0.0;
         let mut dy = 0.0;
         let mut dz = 0.0;
         let mut sp = 0.0;
 
-        if self.pu.is_hit(&input) {
+        if self.pu.is_hit(&window.input) {
             dz += C;
         }
-        if self.pd.is_hit(&input) {
+        if self.pd.is_hit(&window.input) {
             dz -= C;
         }
-        if self.yl.is_hit(&input) {
+        if self.yl.is_hit(&window.input) {
             dy += C;
         }
-        if self.yr.is_hit(&input) {
+        if self.yr.is_hit(&window.input) {
             dy -= C;
         }
-        if self.rl.is_hit(&input) {
+        if self.rl.is_hit(&window.input) {
             dx += C;
         }
-        if self.rr.is_hit(&input) {
+        if self.rr.is_hit(&window.input) {
             dx -= C;
         }
-        if self.fwd.is_hit(&input) {
+        if self.fwd.is_hit(&window.input) {
             sp += C;
         }
-        if self.rev.is_hit(&input) {
+        if self.rev.is_hit(&window.input) {
             sp -= C;
         }
 
-        let mut b = target.borrow_mut();
+        let mut b = target.entity.body.borrow_mut();
         let r = b.position().rotation;
         b.append_lin_force(r * nphysics3d::math::Vector::new(sp, 0.0, 0.0));
         b.append_ang_force(r * nphysics3d::math::Vector::new(dx, dy, dz));
+
+        if self.pew.is_hit(&window.input) {
+            // TODO delay
+            target.shoot(window, world, registry)
+        }
     }
 }
 
@@ -63,16 +75,31 @@ struct Entity {
     mesh: three::Mesh,
 }
 
-struct Cube {
+struct Ship {
     entity: Entity,
+    hitpoints: u32,
 }
 
 struct Bullet {
     entity: Entity,
+    damage: u32,
 }
 
-impl Cube {
-    fn new(window: &mut three::Window, world: &mut nphysics3d::world::World<f32>, x: f32, y: f32, z: f32) -> Cube {
+type CollisionObject = ncollide::world::CollisionObject<
+    nphysics3d::math::Point<f32>,
+    nphysics3d::math::Isometry<f32>,
+    nphysics3d::object::WorldObject<f32>,
+>;
+
+impl Ship {
+    fn new(
+        window: &mut three::Window,
+        world: &mut nphysics3d::world::World<f32>,
+        x: f32,
+        y: f32,
+        z: f32,
+        hp: u32,
+    ) -> Ship {
         let shape = ncollide::shape::Cuboid::new(nphysics3d::math::Vector::new(0.5, 0.5, 0.5));
         let mut body = nphysics3d::object::RigidBody::new_dynamic(shape, 1.0, 1.0, 1.0);
 
@@ -80,41 +107,72 @@ impl Cube {
         let hndl = world.add_rigid_body(body);
 
         let geom = three::Geometry::new_box(1.0, 1.0, 1.0);
-        let mesh = window.factory.mesh(geom, three::Material::MeshLambert { color: 0xabcdef, flat: true });
+        let mesh = window.factory.mesh(
+            geom,
+            three::Material::MeshLambert {
+                color: 0xabcdef,
+                flat: true,
+            },
+        );
         window.scene.add(&mesh);
 
-        Cube {
+        Ship {
             entity: Entity {
                 body: hndl,
                 mesh: mesh,
-            }
+            },
+            hitpoints: hp,
         }
+    }
+
+    fn shoot(
+        &self,
+        window: &mut three::Window,
+        world: &mut nphysics3d::world::World<f32>,
+        registry: &mut Registry,
+    ) {
+        registry.add(Bullet::new(window, world, 0.0, 0.0, 0.0, 1));
     }
 }
 
 impl Bullet {
-    fn new(window: &mut three::Window, world: &mut nphysics3d::world::World<f32>, x: f32, y: f32, z: f32) -> Bullet {
-        let shape = ncollide::shape::Cylinder::new(0.5, 0.1);
+    fn new(
+        window: &mut three::Window,
+        world: &mut nphysics3d::world::World<f32>,
+        x: f32,
+        y: f32,
+        z: f32,
+        d: u32,
+    ) -> Bullet {
+        // FIXME these probably need to be adjusted according to the size of the
+        // cylinder body
+        let shape = ncollide::shape::Cone::new(0.5, 0.75);
         let mut body = nphysics3d::object::RigidBody::new_dynamic(shape, 1.0, 1.0, 1.0);
 
         body.set_translation(nphysics3d::math::Translation::new(x, y, z));
         let hndl = world.add_rigid_body(body);
 
-        let geom = three::Geometry::new_cylinder(0.1, 0.1, 1.0, 256);
-        let mesh = window.factory.mesh(geom, three::Material::MeshLambert { color: 0xabcdef, flat: true });
+        let geom = three::Geometry::new_cylinder(0.01, 0.1, 0.25, 256);
+        let mesh = window.factory.mesh(
+            geom,
+            three::Material::MeshLambert {
+                color: 0xabcdef,
+                flat: true,
+            },
+        );
         window.scene.add(&mesh);
 
         Bullet {
             entity: Entity {
                 body: hndl,
                 mesh: mesh,
-            }
+            },
+            damage: d,
         }
     }
 }
 
-
-impl Ent for Cube {
+impl Ent for Ship {
     fn get_body(&self) -> nphysics3d::object::RigidBodyHandle<f32> {
         self.entity.body.clone()
     }
@@ -131,7 +189,6 @@ impl Ent for Bullet {
         &mut self.entity.mesh
     }
 }
-
 
 trait Ent {
     fn get_body(&self) -> nphysics3d::object::RigidBodyHandle<f32>;
@@ -174,7 +231,10 @@ impl RegistryData {
         }
     }
 
-    fn add<T>(&mut self, entity: T) -> u64 where T: Ent + 'static {
+    fn add<T>(&mut self, entity: T) -> u64
+    where
+        T: Ent + 'static,
+    {
         let id = self.counter;
         self.counter += 1;
         self.entities.insert(id, Box::new(entity));
@@ -215,6 +275,26 @@ impl Registry {
     }
 }
 
+impl ncollide::narrow_phase::ContactHandler<
+    nphysics3d::math::Point<f32>,
+    nphysics3d::math::Isometry<f32>,
+    nphysics3d::object::WorldObject<f32>,
+> for Registry {
+    fn handle_contact_started(
+        &mut self,
+        co1: &CollisionObject,
+        _co2: &CollisionObject,
+        contacts: &ncollide::narrow_phase::ContactAlgorithm<
+            nphysics3d::math::Point<f32>,
+            nphysics3d::math::Isometry<f32>,
+        >,
+    ) {
+        println!("collision detected");
+    }
+
+    fn handle_contact_stopped(&mut self, _co1: &CollisionObject, _co2: &CollisionObject) {}
+}
+
 fn main() {
     let mut window = three::Window::new("Steroids", "shaders");
 
@@ -241,26 +321,35 @@ fn main() {
 
         fwd: three::Button::Key(three::Key::A),
         rev: three::Button::Key(three::Key::Z),
+
+        pew: three::Button::Key(three::Key::Space),
     };
 
     let mut entities = Registry::new();
 
-    let player_id = entities.add(Cube::new(&mut window, &mut world, -1.1, 0.1, 0.0));
-    entities.add(Cube::new(&mut window, &mut world, 1.1, -0.1, 0.0));
-    entities.add(Cube::new(&mut window, &mut world, 2.2, -0.1, 0.1));
-    entities.add(Cube::new(&mut window, &mut world, 3.3, -0.1, 0.2));
-    entities.add(Cube::new(&mut window, &mut world, 4.4, -0.1, 0.3));
+    world.register_contact_handler("entities", entities.clone());
 
-    entities.add(Bullet::new(&mut window, &mut world, 0.5, -0.1, 2.0));
+    let mut player = Ship::new(&mut window, &mut world, -1.1, 0.1, 0.0, 100);
+
+    entities.add(Ship::new(&mut window, &mut world, 1.1, -0.1, 0.0, 100));
+    entities.add(Ship::new(&mut window, &mut world, 2.2, -0.1, 0.1, 100));
+    entities.add(Ship::new(&mut window, &mut world, 3.3, -0.1, 0.2, 100));
+    entities.add(Ship::new(&mut window, &mut world, 4.4, -0.1, 0.3, 100));
 
     while window.update() {
         entities.apply_all(|e| e.update_body());
-        entities.apply_one(player_id, |e| control.update(&e.get_body(), &window.input));
+        player.update_body();
+
+        control.update(&mut player, &mut window, &mut world, &mut entities);
 
         world.step(0.017);
 
         entities.apply_all(|e| e.update_mesh());
-        entities.apply_one(player_id, |e| e.look_at(&mut camera));
+        player.update_mesh();
+
+        // entities.retain(|e| e.alive());
+
+        player.look_at(&mut camera);
 
         window.render(&camera);
     }
