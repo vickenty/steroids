@@ -2,6 +2,8 @@ extern crate three;
 extern crate nphysics3d;
 extern crate ncollide;
 
+use std::rc::Rc;
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 struct Controller {
@@ -159,15 +161,14 @@ trait Ent {
     }
 }
 
-
-struct Registry {
+struct RegistryData {
     counter: u64,
     entities: HashMap<u64, Box<Ent>>,
 }
 
-impl Registry {
-    fn new() -> Registry {
-        Registry {
+impl RegistryData {
+    fn new() -> RegistryData {
+        RegistryData {
             counter: 0,
             entities: HashMap::new(),
         }
@@ -190,6 +191,27 @@ impl Registry {
         for e in self.entities.values_mut() {
             f(e)
         }
+    }
+}
+
+#[derive(Clone)]
+struct Registry(Rc<RefCell<RegistryData>>);
+
+impl Registry {
+    fn new() -> Self {
+        Registry(Rc::new(RefCell::new(RegistryData::new())))
+    }
+
+    fn add<T: Ent + 'static>(&self, entity: T) -> u64 {
+        self.0.borrow_mut().add(entity)
+    }
+
+    fn apply_one<F: FnMut(&mut Box<Ent>)>(&mut self, id: u64, mut f: F) {
+        self.0.borrow_mut().apply_one(id, f)
+    }
+
+    fn apply_all<F: FnMut(&mut Box<Ent>)>(&mut self, mut f: F) {
+        self.0.borrow_mut().apply_all(f)
     }
 }
 
