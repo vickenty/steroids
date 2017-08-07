@@ -23,50 +23,52 @@ const C: f32 = 1.0;
 impl Controller {
     fn update(
         &self,
-        target: &mut Ship,
+        target: &mut Box<Ent>,
         window: &mut three::Window,
         world: &mut nphysics3d::world::World<f32>,
-        registry: &mut Registry,
+        registry: &Registry,
     ) {
-        let mut dx = 0.0;
-        let mut dy = 0.0;
-        let mut dz = 0.0;
-        let mut sp = 0.0;
+        let mut roll = 0.0;
+        let mut yaw = 0.0;
+        let mut pitch = 0.0;
+        let mut throttle = 0.0;
 
         if self.pu.is_hit(&window.input) {
-            dz += C;
+            pitch += C;
         }
         if self.pd.is_hit(&window.input) {
-            dz -= C;
+            pitch -= C;
         }
         if self.yl.is_hit(&window.input) {
-            dy += C;
+            yaw += C;
         }
         if self.yr.is_hit(&window.input) {
-            dy -= C;
+            yaw -= C;
         }
         if self.rl.is_hit(&window.input) {
-            dx += C;
+            roll += C;
         }
         if self.rr.is_hit(&window.input) {
-            dx -= C;
+            roll -= C;
         }
         if self.fwd.is_hit(&window.input) {
-            sp += C;
+            throttle += C;
         }
         if self.rev.is_hit(&window.input) {
-            sp -= C;
+            throttle -= C;
         }
 
-        let mut b = target.entity.body.borrow_mut();
-        let r = b.position().rotation;
-        b.append_lin_force(r * nphysics3d::math::Vector::new(sp, 0.0, 0.0));
-        b.append_ang_force(r * nphysics3d::math::Vector::new(dx, dy, dz));
+        target.handle_controls(
+            pitch,
+            yaw,
+            roll,
+            throttle,
+            self.pew.is_hit(&window.input),
+            window,
+            world,
+            registry,
+        );
 
-        if self.pew.is_hit(&window.input) {
-            // TODO delay
-            target.shoot(window, world, registry)
-        }
     }
 }
 
@@ -129,9 +131,9 @@ impl Ship {
         &self,
         window: &mut three::Window,
         world: &mut nphysics3d::world::World<f32>,
-        registry: &mut Registry,
+        registry: &Registry,
     ) {
-        registry.add(Bullet::new(window, world, 0.0, 0.0, 0.0, 1));
+        registry.add_deferred(Bullet::new(window, world, 0.0, 0.0, 0.0, 1));
     }
 }
 
@@ -179,6 +181,29 @@ impl Ent for Ship {
     fn get_mesh(&mut self) -> &mut three::Mesh {
         &mut self.entity.mesh
     }
+
+    fn handle_controls(
+        &mut self,
+        pitch: f32,
+        yaw: f32,
+        roll: f32,
+        throttle: f32,
+        shoot: bool,
+        window: &mut three::Window,
+        world: &mut nphysics3d::world::World<f32>,
+        registry: &Registry,
+    ) {
+        let mut b = self.entity.body.borrow_mut();
+        let r = b.position().rotation;
+        b.append_lin_force(r * nphysics3d::math::Vector::new(throttle, 0.0, 0.0));
+        b.append_ang_force(r * nphysics3d::math::Vector::new(roll, yaw, pitch));
+
+        if shoot {
+            // TODO delay
+            self.shoot(window, world, registry)
+        }
+
+    }
 }
 
 impl Ent for Bullet {
@@ -216,6 +241,20 @@ trait Ent {
         let pf: [f32; 3] = body.borrow().position().translation.vector.into();
         camera.look_at([5.0, 5.0, 5.0], pf, None);
     }
+
+    fn handle_controls(
+        &mut self,
+        _pitch: f32,
+        _yaw: f32,
+        _roll: f32,
+        _throttle: f32,
+        _shoot: bool,
+        _window: &mut three::Window,
+        _world: &mut nphysics3d::world::World<f32>,
+        _registry: &Registry,
+    ) {
+        unimplemented!();
+    }
 }
 
 struct RegistryData {
@@ -231,14 +270,18 @@ impl RegistryData {
         }
     }
 
+    fn add_boxed(&mut self, entity: Box<Ent>) -> u64 {
+        let id = self.counter;
+        self.counter += 1;
+        self.entities.insert(id, entity);
+        id
+    }
+
     fn add<T>(&mut self, entity: T) -> u64
     where
         T: Ent + 'static,
     {
-        let id = self.counter;
-        self.counter += 1;
-        self.entities.insert(id, Box::new(entity));
-        id
+        self.add_boxed(Box::new(entity))
     }
 
     fn apply_one<F: FnMut(&mut Box<Ent>)>(&mut self, id: u64, mut f: F) {
@@ -255,23 +298,40 @@ impl RegistryData {
 }
 
 #[derive(Clone)]
-struct Registry(Rc<RefCell<RegistryData>>);
+struct Registry {
+    data: Rc<RefCell<RegistryData>>,
+    buffer: Rc<RefCell<Vec<Box<Ent>>>>,
+}
 
 impl Registry {
     fn new() -> Self {
-        Registry(Rc::new(RefCell::new(RegistryData::new())))
+        Registry {
+            data: Rc::new(RefCell::new(RegistryData::new())),
+            buffer: Rc::new(RefCell::new(Vec::new())),
+        }
     }
 
     fn add<T: Ent + 'static>(&self, entity: T) -> u64 {
-        self.0.borrow_mut().add(entity)
+        self.data.borrow_mut().add(entity)
     }
 
-    fn apply_one<F: FnMut(&mut Box<Ent>)>(&mut self, id: u64, mut f: F) {
-        self.0.borrow_mut().apply_one(id, f)
+    fn apply_one<F: FnMut(&mut Box<Ent>)>(&self, id: u64, f: F) {
+        self.data.borrow_mut().apply_one(id, f)
     }
 
-    fn apply_all<F: FnMut(&mut Box<Ent>)>(&mut self, mut f: F) {
-        self.0.borrow_mut().apply_all(f)
+    fn apply_all<F: FnMut(&mut Box<Ent>)>(&self, f: F) {
+        self.data.borrow_mut().apply_all(f)
+    }
+
+    fn add_deferred<T: Ent + 'static>(&self, entity: T) {
+        self.buffer.borrow_mut().push(Box::new(entity));
+    }
+
+    fn execute_defferred(&self) {
+        let mut buf = self.buffer.borrow_mut();
+        for e in buf.drain(0..) {
+            self.data.borrow_mut().add_boxed(e);
+        }
     }
 }
 
@@ -282,9 +342,9 @@ impl ncollide::narrow_phase::ContactHandler<
 > for Registry {
     fn handle_contact_started(
         &mut self,
-        co1: &CollisionObject,
+        _co1: &CollisionObject,
         _co2: &CollisionObject,
-        contacts: &ncollide::narrow_phase::ContactAlgorithm<
+        _contacts: &ncollide::narrow_phase::ContactAlgorithm<
             nphysics3d::math::Point<f32>,
             nphysics3d::math::Isometry<f32>,
         >,
@@ -325,11 +385,11 @@ fn main() {
         pew: three::Button::Key(three::Key::Space),
     };
 
-    let mut entities = Registry::new();
+    let entities = Registry::new();
 
     world.register_contact_handler("entities", entities.clone());
 
-    let mut player = Ship::new(&mut window, &mut world, -1.1, 0.1, 0.0, 100);
+    let player_id = entities.add(Ship::new(&mut window, &mut world, -1.1, 0.1, 0.0, 100));
 
     entities.add(Ship::new(&mut window, &mut world, 1.1, -0.1, 0.0, 100));
     entities.add(Ship::new(&mut window, &mut world, 2.2, -0.1, 0.1, 100));
@@ -338,18 +398,19 @@ fn main() {
 
     while window.update() {
         entities.apply_all(|e| e.update_body());
-        player.update_body();
 
-        control.update(&mut player, &mut window, &mut world, &mut entities);
+        entities.apply_one(player_id, |e| {
+            control.update(e, &mut window, &mut world, &entities)
+        });
+        entities.execute_defferred();
 
         world.step(0.017);
 
         entities.apply_all(|e| e.update_mesh());
-        player.update_mesh();
 
         // entities.retain(|e| e.alive());
 
-        player.look_at(&mut camera);
+        entities.apply_one(player_id, |e| e.look_at(&mut camera));
 
         window.render(&camera);
     }
