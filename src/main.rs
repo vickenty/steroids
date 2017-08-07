@@ -265,7 +265,7 @@ struct RegistryData {
 impl RegistryData {
     fn new() -> RegistryData {
         RegistryData {
-            counter: 0,
+            counter: 1,
             entities: HashMap::new(),
         }
     }
@@ -273,7 +273,12 @@ impl RegistryData {
     fn add_boxed(&mut self, entity: Box<Ent>) -> u64 {
         let id = self.counter;
         self.counter += 1;
+
+        let body = entity.get_body();
+        body.borrow_mut().set_user_data(Some(Box::new(id)));
+
         self.entities.insert(id, entity);
+
         id
     }
 
@@ -335,6 +340,18 @@ impl Registry {
     }
 }
 
+fn unpack_user_data(co: &CollisionObject) -> Option<u64> {
+    if let nphysics3d::object::WorldObject::RigidBody(ref body_hndl) = co.data {
+        if let Some(user_data) = body_hndl.borrow().user_data() {
+            if let Some(id) = user_data.downcast_ref::<u64>() {
+                return Some(*id);
+            }
+        }
+    }
+
+    None
+}
+
 impl ncollide::narrow_phase::ContactHandler<
     nphysics3d::math::Point<f32>,
     nphysics3d::math::Isometry<f32>,
@@ -342,14 +359,22 @@ impl ncollide::narrow_phase::ContactHandler<
 > for Registry {
     fn handle_contact_started(
         &mut self,
-        _co1: &CollisionObject,
-        _co2: &CollisionObject,
+        co1: &CollisionObject,
+        co2: &CollisionObject,
         _contacts: &ncollide::narrow_phase::ContactAlgorithm<
             nphysics3d::math::Point<f32>,
             nphysics3d::math::Isometry<f32>,
         >,
     ) {
-        println!("collision detected");
+        let id1 = match unpack_user_data(co1) {
+            Some(id) => id,
+            None => return,
+        };
+        let id2 = match unpack_user_data(co2) {
+            Some(id) => id,
+            None => return,
+        };
+        println!("collision detected: {}:{}", id1, id2);
     }
 
     fn handle_contact_stopped(&mut self, _co1: &CollisionObject, _co2: &CollisionObject) {}
