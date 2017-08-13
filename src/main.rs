@@ -380,6 +380,11 @@ impl ncollide::narrow_phase::ContactHandler<
     fn handle_contact_stopped(&mut self, _co1: &CollisionObject, _co2: &CollisionObject) {}
 }
 
+fn make_background(factory: &mut three::Factory) -> three::Mesh {
+    let geo = three::Geometry::new_sphere(90.0, 32, 32);
+    factory.mesh(geo, three::Material::LineBasic { color: 0x204060 })
+}
+
 fn main() {
     let mut window = three::Window::new("Steroids", "shaders");
 
@@ -420,6 +425,10 @@ fn main() {
     entities.add(Ship::new(&mut window, &mut world, 2.2, -0.1, 0.1, 100));
     entities.add(Ship::new(&mut window, &mut world, 3.3, -0.1, 0.2, 100));
     entities.add(Ship::new(&mut window, &mut world, 4.4, -0.1, 0.3, 100));
+
+    let mut background = make_background(&mut window.factory);
+    background.set_position([5.0, 5.0, 5.0]); // TODO: set to pos of camera
+    window.scene.add(&background);
 
     while window.update() {
         entities.apply_all(|e| e.update_body());
