@@ -195,8 +195,8 @@ impl Ent for Ship {
     ) {
         let mut b = self.entity.body.borrow_mut();
         let r = b.position().rotation;
-        b.append_lin_force(r * nphysics3d::math::Vector::new(throttle, 0.0, 0.0));
-        b.append_ang_force(r * nphysics3d::math::Vector::new(roll, yaw, pitch));
+        b.append_lin_force(r * nphysics3d::math::Vector::new(0.0, 0.0, -throttle));
+        b.append_ang_force(r * nphysics3d::math::Vector::new(-pitch, yaw, roll));
 
         if shoot {
             // TODO delay
