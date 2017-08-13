@@ -236,10 +236,16 @@ trait Ent {
         self.get_mesh().set_transform(pf, rf, 1.0);
     }
 
-    fn look_at(&self, camera: &mut three::Camera<three::Perspective>) {
+    fn look_at(
+        &self,
+        camera: &mut three::Camera<three::Perspective>,
+        background: &mut three::Mesh,
+    ) {
         let body = self.get_body();
         let pf: [f32; 3] = body.borrow().position().translation.vector.into();
-        camera.look_at([5.0, 5.0, 5.0], pf, None);
+        let rf: [f32; 4] = body.borrow().position().rotation.as_ref().coords.into();
+        camera.set_transform(pf, rf, 1.0);
+        background.set_position(pf);
     }
 
     fn handle_controls(
@@ -444,7 +450,7 @@ fn main() {
 
         // entities.retain(|e| e.alive());
 
-        entities.apply_one(player_id, |e| e.look_at(&mut camera));
+        entities.apply_one(player_id, |e| e.look_at(&mut camera, &mut background));
 
         window.render(&camera);
     }
