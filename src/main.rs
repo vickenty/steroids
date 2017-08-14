@@ -80,6 +80,10 @@ struct Entity {
 struct Ship {
     entity: Entity,
     hitpoints: u32,
+
+    pitch: f32,
+    yaw: f32,
+    roll: f32,
 }
 
 struct Bullet {
@@ -124,6 +128,9 @@ impl Ship {
                 mesh: mesh,
             },
             hitpoints: hp,
+            pitch: 0.0,
+            yaw: 0.0,
+            roll: 0.0,
         }
     }
 
@@ -195,8 +202,23 @@ impl Ent for Ship {
     ) {
         let mut b = self.entity.body.borrow_mut();
         let r = b.position().rotation;
+
+        fn fade_in(cur: f32, new: f32, alpha: f32) -> f32 {
+            if new != 0.0 {
+                new * alpha + cur * (1.0 - alpha)
+            } else {
+                0.0
+            }
+        }
+
+        self.pitch = fade_in(self.pitch, -pitch, 0.1);
+        self.roll = fade_in(self.roll, roll, 0.1);
+        self.yaw = fade_in(self.yaw, yaw, 0.1);
+
         b.append_lin_force(r * nphysics3d::math::Vector::new(0.0, 0.0, -throttle));
-        b.append_ang_force(r * nphysics3d::math::Vector::new(-pitch, yaw, roll));
+        b.append_ang_force(
+            r * nphysics3d::math::Vector::new(self.pitch, self.yaw, self.roll),
+        );
 
         if shoot {
             // TODO delay
