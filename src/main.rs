@@ -84,6 +84,8 @@ struct Ship {
     pitch: f32,
     yaw: f32,
     roll: f32,
+
+    fire_delay: u32,
 }
 
 struct Bullet {
@@ -131,16 +133,25 @@ impl Ship {
             pitch: 0.0,
             yaw: 0.0,
             roll: 0.0,
+
+            fire_delay: 0,
         }
     }
 
     fn shoot(
-        &self,
+        &mut self,
         position: &nphysics3d::math::Isometry<f32>,
         window: &mut three::Window,
         world: &mut nphysics3d::world::World<f32>,
         registry: &Registry,
     ) {
+        if self.fire_delay > 0 {
+            self.fire_delay -= 1;
+            return;
+        }
+
+        self.fire_delay = 60;
+
         let gunpoint = nphysics3d::math::Translation::new(0.0, 0.0, -2.0);
         let bullet_position = position * gunpoint;
 
@@ -210,29 +221,29 @@ impl Ent for Ship {
         world: &mut nphysics3d::world::World<f32>,
         registry: &Registry,
     ) {
-        let mut b = self.entity.body.borrow_mut();
-        let r = b.position().rotation;
+        {
+            let mut b = self.entity.body.borrow_mut();
+            let r = b.position().rotation;
 
-        fn fade_in(cur: f32, new: f32, alpha: f32) -> f32 {
-            if new != 0.0 {
-                new * alpha + cur * (1.0 - alpha)
-            } else {
-                0.0
+            fn fade_in(cur: f32, new: f32, alpha: f32) -> f32 {
+                if new != 0.0 {
+                    new * alpha + cur * (1.0 - alpha)
+                } else {
+                    0.0
+                }
             }
+
+            self.pitch = fade_in(self.pitch, -pitch, 0.1);
+            self.roll = fade_in(self.roll, roll, 0.1);
+            self.yaw = fade_in(self.yaw, yaw, 0.1);
+
+            b.append_lin_force(r * nphysics3d::math::Vector::new(0.0, 0.0, -throttle));
+            b.append_ang_force(
+                r * nphysics3d::math::Vector::new(self.pitch, self.yaw, self.roll),
+            );
         }
-
-        self.pitch = fade_in(self.pitch, -pitch, 0.1);
-        self.roll = fade_in(self.roll, roll, 0.1);
-        self.yaw = fade_in(self.yaw, yaw, 0.1);
-
-        b.append_lin_force(r * nphysics3d::math::Vector::new(0.0, 0.0, -throttle));
-        b.append_ang_force(
-            r * nphysics3d::math::Vector::new(self.pitch, self.yaw, self.roll),
-        );
-
         if shoot {
-            // TODO delay
-            let position = b.position();
+            let position = self.entity.body.borrow().position().clone();
             self.shoot(&position, window, world, registry)
         }
 
