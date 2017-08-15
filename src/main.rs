@@ -165,7 +165,8 @@ impl Bullet {
         let shape = ncollide::shape::Cone::new(0.5, 0.75);
         let mut body = nphysics3d::object::RigidBody::new_dynamic(shape, 1.0, 1.0, 1.0);
 
-        body.set_lin_vel(nphysics3d::math::Vector::new(0.0, 0.0, -5.0));
+        let direction = position * nphysics3d::math::Vector::new(0.0, 0.0, -15.0);
+        body.set_lin_vel(direction);
 
         body.set_transformation(position);
         let hndl = world.add_rigid_body(body);
