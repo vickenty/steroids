@@ -136,11 +136,20 @@ impl Ship {
 
     fn shoot(
         &self,
+        position: &nphysics3d::math::Isometry<f32>,
         window: &mut three::Window,
         world: &mut nphysics3d::world::World<f32>,
         registry: &Registry,
     ) {
-        registry.add_deferred(Bullet::new(window, world, 0.0, 0.0, 0.0, 1));
+        let gunpoint = nphysics3d::math::Translation::new(0.0, 0.0, -2.0);
+        let bullet_position = position * gunpoint;
+
+        registry.add_deferred(Bullet::new(
+            window,
+            world,
+            bullet_position,
+            1,
+        ));
     }
 }
 
@@ -148,17 +157,17 @@ impl Bullet {
     fn new(
         window: &mut three::Window,
         world: &mut nphysics3d::world::World<f32>,
-        x: f32,
-        y: f32,
-        z: f32,
-        d: u32,
+        position: nphysics3d::math::Isometry<f32>,
+        damage: u32,
     ) -> Bullet {
         // FIXME these probably need to be adjusted according to the size of the
         // cylinder body
         let shape = ncollide::shape::Cone::new(0.5, 0.75);
         let mut body = nphysics3d::object::RigidBody::new_dynamic(shape, 1.0, 1.0, 1.0);
 
-        body.set_translation(nphysics3d::math::Translation::new(x, y, z));
+        body.set_lin_vel(nphysics3d::math::Vector::new(0.0, 0.0, -5.0));
+
+        body.set_transformation(position);
         let hndl = world.add_rigid_body(body);
 
         let geom = three::Geometry::new_cylinder(0.01, 0.1, 0.25, 256);
@@ -176,7 +185,7 @@ impl Bullet {
                 body: hndl,
                 mesh: mesh,
             },
-            damage: d,
+            damage: damage,
         }
     }
 }
@@ -222,7 +231,8 @@ impl Ent for Ship {
 
         if shoot {
             // TODO delay
-            self.shoot(window, world, registry)
+            let position = b.position();
+            self.shoot(&position, window, world, registry)
         }
 
     }
