@@ -146,7 +146,6 @@ impl Ship {
         registry: &Registry,
     ) {
         if self.fire_delay > 0 {
-            self.fire_delay -= 1;
             return;
         }
 
@@ -162,6 +161,8 @@ impl Ship {
             1,
         ));
     }
+
+
 }
 
 impl Bullet {
@@ -221,6 +222,10 @@ impl Ent for Ship {
         world: &mut nphysics3d::world::World<f32>,
         registry: &Registry,
     ) {
+        if self.fire_delay > 0 {
+            self.fire_delay -= 1;
+        }
+
         {
             let mut b = self.entity.body.borrow_mut();
             let r = b.position().rotation;
