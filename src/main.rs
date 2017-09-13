@@ -9,10 +9,12 @@ use std::collections::HashMap;
 mod ship;
 mod bullet;
 mod controller;
+mod roid;
 
 use ship::Ship;
 use bullet::Bullet;
 use controller::Controller;
+use roid::Roid;
 
 struct Entity {
     body: nphysics3d::object::RigidBodyHandle<f32>,
@@ -234,10 +236,10 @@ fn main() {
 
     let player_id = entities.add(Ship::new(&mut window, &mut world, -1.1, 0.1, 0.0, 100));
 
-    entities.add(Ship::new(&mut window, &mut world, 1.1, -0.1, 0.0, 100));
-    entities.add(Ship::new(&mut window, &mut world, 2.2, -0.1, 0.1, 100));
-    entities.add(Ship::new(&mut window, &mut world, 3.3, -0.1, 0.2, 100));
-    entities.add(Ship::new(&mut window, &mut world, 4.4, -0.1, 0.3, 100));
+    entities.add(Roid::new(&mut window, &mut world, 1.1, -0.1, 0.0, 100));
+    entities.add(Roid::new(&mut window, &mut world, 2.2, -0.1, 0.1, 100));
+    entities.add(Roid::new(&mut window, &mut world, 3.3, -0.1, 0.2, 100));
+    entities.add(Roid::new(&mut window, &mut world, 4.4, -0.1, 0.3, 100));
 
     let mut background = make_background(&mut window.factory);
     background.set_position([5.0, 5.0, 5.0]); // TODO: set to pos of camera
