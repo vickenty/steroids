@@ -49,8 +49,7 @@ impl Bullet {
 }
 
 impl Ent for Bullet {
-    fn update_logic(&mut self) {
-    }
+    fn update_logic(&mut self) {}
 
     fn update_mesh(&mut self) {
         self.entity.update_mesh();

@@ -73,12 +73,7 @@ impl Ship {
         let gunpoint = nphysics3d::math::Translation::new(0.0, 0.0, -2.0);
         let bullet_position = position * gunpoint;
 
-        registry.add_deferred(Bullet::new(
-            window,
-            world,
-            bullet_position,
-            1,
-        ));
+        registry.add_deferred(Bullet::new(window, world, bullet_position, 1));
     }
 }
 

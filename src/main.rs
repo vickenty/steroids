@@ -53,7 +53,8 @@ trait Ent {
         &self,
         camera: &mut three::Camera<three::Perspective>,
         background: &mut three::Mesh,
-    ) {}
+    ) {
+    }
 
     fn handle_controls(
         &mut self,
