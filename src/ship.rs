@@ -90,7 +90,7 @@ impl Ent for Ship {
         background.set_position(pf);
     }
 
-    fn update_logic(&mut self) {
+    fn update_logic(&mut self, world: &mut nphysics3d::world::World<f32>) {
         if self.fire_delay > 0 {
             self.fire_delay -= 1;
         }

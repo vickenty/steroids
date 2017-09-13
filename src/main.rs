@@ -37,7 +37,6 @@ impl Entity {
     }
 }
 
-
 type CollisionObject = ncollide::world::CollisionObject<
     nphysics3d::math::Point<f32>,
     nphysics3d::math::Isometry<f32>,
@@ -45,7 +44,7 @@ type CollisionObject = ncollide::world::CollisionObject<
 >;
 
 trait Ent {
-    fn update_logic(&mut self);
+    fn update_logic(&mut self, world: &mut nphysics3d::world::World<f32>);
 
     fn update_mesh(&mut self);
 
@@ -71,6 +70,8 @@ trait Ent {
     ) {
         unimplemented!();
     }
+
+    fn alive(&self) -> bool { true }
 }
 
 struct RegistryData {
@@ -246,7 +247,7 @@ fn main() {
     window.scene.add(&background);
 
     while window.update() {
-        entities.apply_all(|e| e.update_logic());
+        entities.apply_all(|e| e.update_logic(&mut world));
 
 
         entities.apply_one(player_id, |e| {

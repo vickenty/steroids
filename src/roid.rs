@@ -49,7 +49,7 @@ impl Roid {
 }
 
 impl Ent for Roid {
-    fn update_logic(&mut self) {}
+    fn update_logic(&mut self, world: &mut nphysics3d::world::World<f32>) {}
 
     fn update_mesh(&mut self) {
         self.entity.update_mesh();

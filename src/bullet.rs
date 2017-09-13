@@ -7,6 +7,7 @@ use Entity;
 
 pub struct Bullet {
     entity: Entity,
+    alive: bool,
     ttl: u32,
     damage: u32,
 }
@@ -44,6 +45,7 @@ impl Bullet {
                 body: hndl,
                 mesh: mesh,
             },
+            alive: true,
             ttl: 300,
             damage: damage,
         }
@@ -51,10 +53,22 @@ impl Bullet {
 }
 
 impl Ent for Bullet {
-    fn update_logic(&mut self) {
+    fn update_logic(&mut self, world: &mut nphysics3d::world::World<f32>) {
         if self.ttl > 0 {
             self.ttl -= 1;
         }
+
+        if self.ttl == 0 {
+            if self.alive {
+                world.remove_rigid_body(&self.entity.body);
+            }
+
+            self.alive = false;
+        }
+    }
+
+    fn alive(&self) -> bool {
+        self.alive
     }
 
     fn update_mesh(&mut self) {
