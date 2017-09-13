@@ -68,7 +68,6 @@ impl Controller {
             world,
             registry,
         );
-
     }
 }
 
@@ -211,6 +210,24 @@ impl Ent for Ship {
         &mut self.entity.mesh
     }
 
+    fn look_at(
+        &self,
+        camera: &mut three::Camera<three::Perspective>,
+        background: &mut three::Mesh,
+    ) {
+        let body = self.entity.body.borrow();
+        let pf: [f32; 3] = body.position().translation.vector.into();
+        let rf: [f32; 4] = body.position().rotation.as_ref().coords.into();
+        camera.set_transform(pf, rf, 1.0);
+        background.set_position(pf);
+    }
+
+    fn update_logic(&mut self) {
+        if self.fire_delay > 0 {
+            self.fire_delay -= 1;
+        }
+    }
+
     fn handle_controls(
         &mut self,
         pitch: f32,
@@ -222,10 +239,6 @@ impl Ent for Ship {
         world: &mut nphysics3d::world::World<f32>,
         registry: &Registry,
     ) {
-        if self.fire_delay > 0 {
-            self.fire_delay -= 1;
-        }
-
         {
             let mut b = self.entity.body.borrow_mut();
             let r = b.position().rotation;
@@ -242,6 +255,7 @@ impl Ent for Ship {
             self.roll = fade_in(self.roll, roll, 0.1);
             self.yaw = fade_in(self.yaw, yaw, 0.1);
 
+            b.clear_forces();
             b.append_lin_force(r * nphysics3d::math::Vector::new(0.0, 0.0, -throttle));
             b.append_ang_force(
                 r * nphysics3d::math::Vector::new(self.pitch, self.yaw, self.roll),
@@ -269,9 +283,7 @@ trait Ent {
 
     fn get_mesh(&mut self) -> &mut three::Mesh;
 
-    fn update_body(&self) {
-        let body = self.get_body();
-        body.borrow_mut().clear_forces();
+    fn update_logic(&mut self) {
     }
 
     fn update_mesh(&mut self) {
@@ -290,11 +302,6 @@ trait Ent {
         camera: &mut three::Camera<three::Perspective>,
         background: &mut three::Mesh,
     ) {
-        let body = self.get_body();
-        let pf: [f32; 3] = body.borrow().position().translation.vector.into();
-        let rf: [f32; 4] = body.borrow().position().rotation.as_ref().coords.into();
-        camera.set_transform(pf, rf, 1.0);
-        background.set_position(pf);
     }
 
     fn handle_controls(
@@ -486,7 +493,8 @@ fn main() {
     window.scene.add(&background);
 
     while window.update() {
-        entities.apply_all(|e| e.update_body());
+        entities.apply_all(|e| e.update_logic());
+
 
         entities.apply_one(player_id, |e| {
             control.update(e, &mut window, &mut world, &entities)
