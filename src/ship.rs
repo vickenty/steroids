@@ -133,7 +133,6 @@ impl Ent for Ship {
             let position = self.entity.body.borrow().position().clone();
             self.shoot(&position, window, world, registry)
         }
-
     }
 
     fn update_mesh(&mut self) {
