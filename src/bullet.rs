@@ -7,6 +7,7 @@ use Entity;
 
 pub struct Bullet {
     entity: Entity,
+    ttl: u32,
     damage: u32,
 }
 
@@ -43,13 +44,18 @@ impl Bullet {
                 body: hndl,
                 mesh: mesh,
             },
+            ttl: 300,
             damage: damage,
         }
     }
 }
 
 impl Ent for Bullet {
-    fn update_logic(&mut self) {}
+    fn update_logic(&mut self) {
+        if self.ttl > 0 {
+            self.ttl -= 1;
+        }
+    }
 
     fn update_mesh(&mut self) {
         self.entity.update_mesh();
