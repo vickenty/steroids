@@ -76,6 +76,22 @@ struct Entity {
     mesh: three::Mesh,
 }
 
+impl Entity {
+    fn update_mesh(&mut self) {
+        let body = self.body.borrow();
+        let pos = body.position();
+
+        let pf: [f32; 3] = pos.translation.vector.into();
+        let rf: [f32; 4] = pos.rotation.as_ref().coords.into();
+
+        self.mesh.set_transform(pf, rf, 1.0);
+    }
+
+    fn set_entity_id(&mut self, id: u64) {
+        self.body.borrow_mut().set_user_data(Some(Box::new(id)));
+    }
+}
+
 struct Ship {
     entity: Entity,
     hitpoints: u32,
@@ -203,13 +219,6 @@ impl Bullet {
 }
 
 impl Ent for Ship {
-    fn get_body(&self) -> nphysics3d::object::RigidBodyHandle<f32> {
-        self.entity.body.clone()
-    }
-    fn get_mesh(&mut self) -> &mut three::Mesh {
-        &mut self.entity.mesh
-    }
-
     fn look_at(
         &self,
         camera: &mut three::Camera<three::Perspective>,
@@ -267,42 +276,41 @@ impl Ent for Ship {
         }
 
     }
+
+    fn update_mesh(&mut self) {
+        self.entity.update_mesh();
+    }
+
+    fn set_entity_id(&mut self, id: u64) {
+        self.entity.set_entity_id(id);
+    }
 }
 
 impl Ent for Bullet {
-    fn get_body(&self) -> nphysics3d::object::RigidBodyHandle<f32> {
-        self.entity.body.clone()
-    }
-    fn get_mesh(&mut self) -> &mut three::Mesh {
-        &mut self.entity.mesh
-    }
-}
-
-trait Ent {
-    fn get_body(&self) -> nphysics3d::object::RigidBodyHandle<f32>;
-
-    fn get_mesh(&mut self) -> &mut three::Mesh;
-
     fn update_logic(&mut self) {
     }
 
     fn update_mesh(&mut self) {
-        let body = self.get_body();
-        let body = body.borrow();
-        let pos = body.position();
-
-        let pf: [f32; 3] = pos.translation.vector.into();
-        let rf: [f32; 4] = pos.rotation.as_ref().coords.into();
-
-        self.get_mesh().set_transform(pf, rf, 1.0);
+        self.entity.update_mesh();
     }
+
+    fn set_entity_id(&mut self, id: u64) {
+        self.entity.set_entity_id(id);
+    }
+}
+
+trait Ent {
+    fn update_logic(&mut self);
+
+    fn update_mesh(&mut self);
+
+    fn set_entity_id(&mut self, id: u64);
 
     fn look_at(
         &self,
         camera: &mut three::Camera<three::Perspective>,
         background: &mut three::Mesh,
-    ) {
-    }
+    ) {}
 
     fn handle_controls(
         &mut self,
@@ -332,12 +340,11 @@ impl RegistryData {
         }
     }
 
-    fn add_boxed(&mut self, entity: Box<Ent>) -> u64 {
+    fn add_boxed(&mut self, mut entity: Box<Ent>) -> u64 {
         let id = self.counter;
         self.counter += 1;
 
-        let body = entity.get_body();
-        body.borrow_mut().set_user_data(Some(Box::new(id)));
+        entity.set_entity_id(id);
 
         self.entities.insert(id, entity);
 
